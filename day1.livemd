@@ -36,42 +36,30 @@ config = %{
 
 input
 |> String.split("\n", trim: true)
-|> Enum.map(fn line ->
-  [id, games] = String.split(line, ":")
-
-  id = id
-    |> String.replace("Game ", "")
-    |> String.to_integer()
-
-  games = games
-    |> String.trim()
-    |> String.split(";")
-    |> Enum.map(&String.trim/1)
-    |> Enum.map(fn rounds ->
-      rounds
-      |> String.split(", ")
-      |> Enum.map(fn pair ->
-        [n, color] = pair
-        |> String.split(" ")
-
-        [n, color]
-      end)
-      |> Enum.group_by(& Enum.at(&1, 1), fn x -> x |> Enum.at(0) |> String.to_integer end)
-      |> Enum.map(fn {k, v} -> {k, List.first(v)} end)
-      |> Enum.into(%{})
+|> Enum.map(fn game ->
+  [game_id, sets] = String.split(game, ": ")
+  id = String.replace(game_id, "Game ", "") |> String.to_integer()
+  sets = sets
+  |> String.split("; ")
+  |> Enum.map(fn set ->
+    set
+    |> String.split(", ")
+    |> Enum.map(fn cube ->
+      [count, color] = String.split(cube, " ")
+      {String.to_atom(color), String.to_integer(count)}
     end)
-
-  { id, games }
+    |> Enum.into(%{})
+  end)
+  {id, sets}
 end)
-|> Enum.filter(fn { _id, rounds } ->
-  impossible = rounds
-    |> Enum.map(&Map.to_list/1)
-    |> List.flatten()
-    |> Enum.filter(fn { c, n } -> n > config[c] end)
-
-  length(impossible) == 0
+|> Enum.filter(fn {_id, sets} ->
+  Enum.all?(sets, fn set ->
+    Map.get(set, :red, 0) <= 12 &&
+    Map.get(set, :green, 0) <= 13 &&
+    Map.get(set, :blue, 0) <= 14
+  end)
 end)
-|> Enum.map(fn { id, _rounds } -> id end)
+|> Enum.map(fn {id, _sets} -> id end)
 |> Enum.sum()
 ```
 
@@ -80,42 +68,23 @@ end)
 
 input
 |> String.split("\n", trim: true)
-|> Enum.map(fn line ->
-  [_, games] = String.split(line, ":")
-
-  games = games
-    |> String.trim()
-    |> String.split(";")
-    |> Enum.map(&String.trim/1)
-    |> Enum.map(fn rounds ->
-      rounds
-      |> String.split(", ")
-      |> Enum.map(fn pair ->
-        [n, color] = pair
-        |> String.split(" ")
-
-        [n, color]
-      end)
-      |> Enum.group_by(& Enum.at(&1, 1), fn x -> x |> Enum.at(0) |> String.to_integer end)
-      |> Enum.map(fn {k, v} -> {k, List.first(v)} end)
-      |> Enum.into(%{})
+|> Enum.map(fn game ->
+  [_game_id, sets] = String.split(game, ": ")
+  sets
+  |> String.split("; ")
+  |> Enum.flat_map(fn set ->
+    set
+    |> String.split(", ")
+    |> Enum.map(fn cube ->
+      [count, color] = String.split(cube, " ")
+      {String.to_atom(color), String.to_integer(count)}
     end)
-
-  games
-end)
-|> Enum.map(fn rounds ->
-  rounds
-  |> Enum.map(&Map.to_list/1)
-  |> List.flatten()
-  |> Enum.reduce(%{}, fn el, acc ->
-    {col, n} = el
-    cur = Map.get(acc, col, 0)
-    if n > cur do
-      Map.put(acc, col, n)
-    else
-      acc
-    end
   end)
+  |> Enum.group_by(
+    fn {color, _} -> color end,
+    fn {_, count} -> count end
+  )
+  |> Map.new(fn {color, counts} -> {color, Enum.max(counts)} end)
   |> Map.values()
   |> Enum.product()
 end)
